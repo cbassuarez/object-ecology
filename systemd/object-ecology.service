@@ -1,0 +1,16 @@
+[Unit]
+Description=object-ecology room-brain harness
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/object-ecology
+ExecStart=/usr/bin/python3 -m hub.main
+Restart=on-failure
+RestartSec=3
+User=seb
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

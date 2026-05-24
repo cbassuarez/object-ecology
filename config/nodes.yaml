@@ -1,0 +1,24 @@
+{
+  "nodes": [
+    {
+      "node_id": "CAN_01",
+      "surface_type": "metal_can",
+      "enabled": true,
+      "transport_channel": "fake",
+      "actuators": [
+        "solenoid_tapper",
+        "vibration_motor"
+      ],
+      "sensors": [
+        "tof_distance",
+        "piezo_contact"
+      ],
+      "traits": {
+        "skittishness": 0.8,
+        "sociability": 0.4,
+        "fatigue_rate": 0.6,
+        "recovery_rate": 0.2
+      }
+    }
+  ]
+}

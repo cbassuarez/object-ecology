@@ -1,0 +1,23 @@
+{
+  "room_id": "room-brain-lab",
+  "logs": {
+    "events": "logs/events.jsonl",
+    "health": "logs/health.jsonl",
+    "fake_state_dir": "logs/fake_nodes",
+    "central_safety_state": "logs/central_safety.json"
+  },
+  "transport": {
+    "mode": "fake",
+    "serial": {
+      "device": null,
+      "baud": 115200,
+      "timeout": 1.0
+    }
+  },
+  "timing": {
+    "tick_hz": 1.0,
+    "poll_interval_seconds": 2.0
+  },
+  "emergency_quiet": false,
+  "startup_mode": "lab"
+}
