@@ -4,7 +4,7 @@
       "node_id": "CAN_01",
       "surface_type": "metal_can",
       "enabled": true,
-      "transport_channel": "fake",
+      "transport_channel": "serial",
       "actuators": [
         "solenoid_tapper",
         "vibration_motor"

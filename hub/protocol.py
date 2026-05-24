@@ -9,6 +9,7 @@ COMMAND_TYPES = {
     "PING",
     "REQUEST_STATE",
     "TAP",
+    "CHATTER",
     "VIBRATE",
     "QUIET",
     "SET_MODE",

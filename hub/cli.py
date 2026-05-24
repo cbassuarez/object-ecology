@@ -29,6 +29,11 @@ def main(tool_name: str | None = None) -> int:
     elif tool == "tap-node":
         parser.add_argument("node_id")
         parser.add_argument("--duration-ms", type=int, required=True)
+    elif tool == "chatter-node":
+        parser.add_argument("node_id")
+        parser.add_argument("--count", type=int, default=4)
+        parser.add_argument("--pulse-ms", type=int, default=12)
+        parser.add_argument("--gap-ms", type=int, default=70)
     elif tool == "vibrate-node":
         parser.add_argument("node_id")
         parser.add_argument("--duration-ms", type=int, required=True)
@@ -66,6 +71,11 @@ def main(tool_name: str | None = None) -> int:
         _print_response(brain.send_command(args.node_id, "QUIET"))
     elif tool == "tap-node":
         _print_response(brain.send_command(args.node_id, "TAP", {"duration_ms": args.duration_ms}))
+    elif tool == "chatter-node":
+        _print_response(brain.send_command(
+            args.node_id, "CHATTER",
+            {"count": args.count, "pulse_ms": args.pulse_ms, "gap_ms": args.gap_ms},
+        ))
     elif tool == "vibrate-node":
         _print_response(brain.send_command(args.node_id, "VIBRATE", {"duration_ms": args.duration_ms}))
     elif tool == "monitor":

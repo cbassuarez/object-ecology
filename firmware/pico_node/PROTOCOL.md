@@ -16,10 +16,18 @@ Initial commands:
 - `PING`
 - `REQUEST_STATE`
 - `TAP`
+- `CHATTER`
 - `VIBRATE`
 - `QUIET`
 - `SET_MODE`
 - `RESET_FATIGUE`
+
+`CHATTER` payload: `{"count": N, "pulse_ms": P, "gap_ms": G}`. Fires a
+burst of `N` short pulses with `G` ms of silence between each. Per-pulse
+duration is capped tighter than a single `TAP` (so chatter is mechanically
+quieter), and the total burst duration is bounded so the firmware response
+arrives within serial timeout. Burst is atomic — the firmware validates
+the whole pattern before firing the first pulse.
 
 Initial responses:
 

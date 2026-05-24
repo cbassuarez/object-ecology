@@ -1,0 +1,13 @@
+# Runtime: needed when room.transport.mode = "serial" (any real hardware node).
+# Phase 0 (fake transport only) still runs on stdlib alone, but enabling the
+# serial transport in hub/transports.py imports this at SerialTransport init.
+pyserial>=3.5
+
+# Dev: flashing/uploading MicroPython firmware to the Pico W. Not imported by
+# the runtime; only used to copy firmware/pico_node/main.py to the device.
+mpremote>=1.20
+
+# Runtime: numeric math for the audio presence detector (hub/presence.py).
+# Audio capture itself spawns ALSA's `arecord` as a subprocess — no PortAudio
+# dependency. numpy is only imported when presence detection is in use.
+numpy>=1.26

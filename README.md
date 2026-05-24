@@ -53,14 +53,20 @@ cd /opt/object-ecology
 chmod +x tools/*
 ```
 
-This phase uses only the Python standard library. A virtual environment is
-optional:
+The fake transport runs on the Python standard library alone. The serial
+transport (a real Pico over USB CDC) needs `pyserial`, and the firmware
+upload flow uses `mpremote`. Both are pinned in `requirements.txt`:
 
 ```bash
 cd /opt/object-ecology
 python3 -m venv .venv
 . .venv/bin/activate
+pip install -r requirements.txt
 ```
+
+You can skip the install entirely while you're only exercising the fake
+transport — `import serial` is lazy and only happens when
+`room.transport.mode = "serial"`.
 
 The config files are `.yaml`, but they are intentionally written as
 JSON-shaped YAML so they can be parsed without PyYAML on a fresh server.
@@ -186,12 +192,61 @@ python3 -m unittest discover -s tests
 
 ## Room-Brain Loop
 
-The main loop currently polls fake node health and logs it:
+The main loop currently polls node health and logs it:
 
 ```bash
 python3 -m hub.main --once
 python3 -m hub.main
 ```
+
+It works against either transport — fake or serial — depending on
+`room.transport.mode`.
+
+## Talking To A Real Pico (phase 1)
+
+Phase-1 firmware is in `firmware/pico_node/`. It mirrors the fake node's
+safety model and blinks the onboard LED on accepted commands, but drives
+no other GPIO yet — see `firmware/pico_node/README.md` for the full scope.
+
+One-time wiring:
+
+1. Flash MicroPython onto the Pico W (see firmware README).
+2. Upload the firmware:
+
+   ```bash
+   mpremote connect /dev/ttyACM0 cp firmware/pico_node/main.py :main.py
+   mpremote connect /dev/ttyACM0 reset
+   ```
+
+3. Point the node at the serial transport. In `config/room.yaml`:
+
+   ```json
+   "transport": {
+     "mode": "serial",
+     "serial": {
+       "device": "/dev/serial/by-id/usb-MicroPython_Board_in_FS_mode_<serial>-if00",
+       "baud": 115200,
+       "timeout": 1.0
+     }
+   }
+   ```
+
+   And in `config/nodes.yaml`, flip the matching node:
+   `"transport_channel": "serial"`. The by-id path is preferred over
+   `/dev/ttyACM0` because it survives replug and other ACM devices.
+
+4. Run the usual CLI:
+
+   ```bash
+   tools/ping-node CAN_01      # Pico LED flashes, host gets PONG
+   tools/tap-node CAN_01 --duration-ms 50
+   tools/tap-node CAN_01 --duration-ms 50    # cooldown_active
+   tools/tap-node CAN_01 --duration-ms 9999  # max_pulse_duration_exceeded
+   ```
+
+If the Pico is unplugged or unresponsive, the host receives a synthetic
+`ERROR` with `reason` `serial_timeout` or `serial_io_failure` and the
+room-brain loop keeps going.
 
 ## Systemd Template
 
@@ -215,16 +270,24 @@ journalctl -u object-ecology.service -f
 
 ## Later Phases
 
-Phase 1:
+Phase 1 (done — USB-CDC):
 
-- real RS485 serial transport
-- Pico heartbeat
-- Pico command parser
+- USB-CDC serial transport (`SerialTransport` in `hub/transports.py`)
+- Pico W MicroPython firmware that parses the protocol and refuses unsafe
+  commands locally (`firmware/pico_node/main.py`)
+- real RS485 serial transport for multi-node bus topology — deferred
 
-Phase 2:
+Phase 2 (in progress — first real actuator):
 
-- one actuator command to a real solenoid through Pico/MOSFET
-- local firmware safety limits
+- GPIO output from Pico to MOSFET-switched solenoid and vibration motor
+- hardware-`Timer`-enforced absolute pulse cutoff so the gate goes LOW even
+  if Python execution hangs mid-pulse
+- wiring spec at `firmware/pico_node/WIRING.md` (Heschen HS-0530B 24 V
+  solenoid + small ERM, separate 24 V rail, common ground, flyback diodes,
+  1.5 A inline fuse, 10 kΩ gate pulldowns)
+- `SOLENOID_ENABLED` / `VIBRATION_ENABLED` constants default to False —
+  fresh upload behaves identically to phase 1 (LED only). Flip the flag and
+  re-upload only after the WIRING.md pre-power checklist passes.
 
 Phase 3:
 

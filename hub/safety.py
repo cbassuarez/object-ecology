@@ -62,9 +62,11 @@ class CentralSafety:
         if self.room_config.get("emergency_quiet"):
             return SafetyDecision(False, "refused", "central_emergency_quiet", payload)
 
-        if command != "TAP":
+        if command not in ("TAP", "CHATTER"):
             return SafetyDecision(True, "allowed", payload=payload)
 
+        # Both TAP and CHATTER count as one solenoid "event" for central
+        # rate-limiting. The firmware handles per-pulse safety internally.
         total_events = self.state.get("tap_events", [])
         node_events = [event for event in total_events if event.get("node_id") == node_id]
         if len(total_events) >= int(self.config.get("max_total_taps_per_minute", 20)):
@@ -72,19 +74,25 @@ class CentralSafety:
         if len(node_events) >= int(self.config.get("max_taps_per_node_per_minute", 6)):
             return SafetyDecision(False, "refused", "central_node_tap_rate_limit", payload)
 
-        duration = int(payload.get("duration_ms", 0))
-        max_duration = int(self.node_defaults.get("max_solenoid_pulse_duration_ms", 100))
-        if duration > max_duration and self.config.get("clamp_unsafe_durations", False):
-            clamped = dict(payload)
-            clamped["duration_ms"] = max_duration
-            return SafetyDecision(True, "clamped", "central_duration_clamp", clamped)
+        if command == "TAP":
+            duration = int(payload.get("duration_ms", 0))
+            max_duration = int(self.node_defaults.get("max_solenoid_pulse_duration_ms", 100))
+            if duration > max_duration and self.config.get("clamp_unsafe_durations", False):
+                clamped = dict(payload)
+                clamped["duration_ms"] = max_duration
+                return SafetyDecision(True, "clamped", "central_duration_clamp", clamped)
 
         return SafetyDecision(True, "allowed", payload=payload)
 
     def record_response(self, node_id: str, command: str, response_type: str, payload: dict[str, Any]) -> None:
-        if command == "TAP" and response_type == "ACK":
+        if command in ("TAP", "CHATTER") and response_type == "ACK":
             self.state.setdefault("tap_events", []).append(
-                {"time": time.time(), "node_id": node_id, "duration_ms": payload.get("duration_ms")}
+                {
+                    "time": time.time(),
+                    "node_id": node_id,
+                    "command": command,
+                    "duration_ms": payload.get("duration_ms") or payload.get("total_on_time_ms"),
+                }
             )
             self._prune(time.time())
             self._save_state()

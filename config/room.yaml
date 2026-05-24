@@ -7,9 +7,9 @@
     "central_safety_state": "logs/central_safety.json"
   },
   "transport": {
-    "mode": "fake",
+    "mode": "serial",
     "serial": {
-      "device": null,
+      "device": "/dev/serial/by-id/usb-MicroPython_Board_in_FS_mode_e6637c05e75f1728-if00",
       "baud": 115200,
       "timeout": 1.0
     }

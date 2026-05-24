@@ -9,3 +9,8 @@ logs/events.jsonl
 logs/health.jsonl
 logs/central_safety.json
 logs/fake_nodes/*.json
+logs/seeing-object.log
+logs/agent.log
+
+# Local reference PDFs — kept on disk but not committed
+Deep Research Backing Conversation*.pdf

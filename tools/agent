@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from hub.agent import SocialAgent
+from hub.scheduler import RoomBrain
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="agent",
+        description="Run the autonomous social-baseline behavior loop for one node.",
+    )
+    parser.add_argument("node_id", help="Node ID to drive, e.g. CAN_01")
+    parser.add_argument("--root", default=None, help="Project root (defaults to this checkout)")
+    parser.add_argument("--max-ticks", type=int, default=None, help="Stop after N ticks (default: run forever)")
+    parser.add_argument("--tick-seconds", type=float, default=None, help="Override base tick interval")
+    args = parser.parse_args()
+
+    brain = RoomBrain(args.root)
+    agent = SocialAgent(brain, args.node_id)
+    if args.tick_seconds is not None:
+        agent.tick_seconds = args.tick_seconds
+    agent.run(max_ticks=args.max_ticks)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
