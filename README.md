@@ -472,9 +472,6 @@ sudo systemctl start object-ecology.service
   Form of Predation Risk*. Conservation Ecology 6(1).
 - Jervis, R. (1978). *Cooperation Under the Security Dilemma*. World
   Politics 30(2).
-- The design notebook ([`readme-brief.md`](readme-brief.md)) — full
-  long-form development of the concept, bill of materials, cabling,
-  and hardware decisions.
 
 ## Acknowledgments
 
