@@ -1,9 +1,9 @@
 # object-ecology
 
-`object-ecology` is the phase-0 control harness for a future networked
-cybernetic actuator installation. The eventual work is a small ecology of
-ordinary object-bodies with internal actuators and sensors. They are not
-chatbots, pets, or responsive gadgets. The engineering model is:
+A networked cybernetic art installation in which ordinary objects —
+each with internal actuators, sensors, and local autonomy — behave
+like animals under disturbance: socializing when alone, listening
+when watched, refusing when asked to do more than is safe.
 
 ```text
 central room brain proposes behavior
@@ -13,133 +13,353 @@ refusal is logged
 refusal becomes part of the artwork
 ```
 
-This phase builds the boring spine only: config loading, protocol messages, a
-fake node, safety budgets, append-only JSONL logs, CLI tools, and a systemd
-template. It does not connect to real actuators.
+## What this is
 
-## What This Phase Implements
+This is not a chatbot, a pet, a responsive toy, or a smart device. The
+engineering frame is ethology: each object is modeled as a small animal
+in a room, and the humans who enter that room are modeled as nonlethal
+predators in the sense of Frid & Dill's *risk-disturbance hypothesis* —
+their mere presence raises the cost of every behavior the animal would
+otherwise express. An object alone in an empty room socializes
+quietly. The same object with humans in the room goes vigilant, hides,
+or freezes. Whether it ever speaks again is a function of how long the
+humans stay, how loud they get, and how the object's internal "energy"
+budget recovers.
 
-- JSON-shaped YAML config files in `config/`
-- one configured fake object node: `CAN_01`
-- line-delimited JSON message protocol
-- fake node simulator with persisted heat/fatigue/cooldown state
-- central safety checks
-- local fake-node safety refusals
-- append-only `logs/events.jsonl` and `logs/health.jsonl`
-- CLI tools in `tools/`
-- a systemd service template in `systemd/object-ecology.service`
-- unit tests for protocol, fake node behavior, and safety refusal
+Two other ideas thread through the work. The first is the *security
+dilemma* from international-relations theory (Jervis, 1978): defensive
+moves can be mistaken for aggression. An object going silent can read,
+to the audience or to a neighbouring object, as panic or threat. The
+second is *refusal*. The room brain proposes behavior. The object's
+local firmware enforces its own safety budget — pulse cap, cooldown,
+heat ceiling — and will refuse commands that would exceed it. Every
+refusal is recorded as a first-class event, not an error. The fact
+that the object can say no is the artwork.
 
-## What This Phase Does Not Implement
+The full conceptual development is in [`readme-brief.md`](readme-brief.md) —
+a long design notebook covering the ethology references, the
+security-dilemma framing, the actuator selection, and the gallery
+deployment topology.
 
-- final artwork behavior
-- audio ML, speech recognition, prosody analysis, or semantic classification
-- real RS485 hardware communication
-- Pico firmware
-- solenoid firing
-- web dashboards
-- databases
-- Docker, Kubernetes, MQTT, OSC, Home Assistant, Ableton, or similar systems
+## Status
 
-## Install On `room-brain`
+A complete proof of concept. One physical object node (a metal can with
+a 24 V solenoid, code-named `CAN_01`) is fully wired and runs the
+autonomous behavior loop end-to-end. The architecture, firmware,
+host-side software, and wiring spec are specified for an eight-node
+gallery installation; scaling to that needs studio time for the
+multi-node cable assembly and the per-object enclosure build.
 
-Copy this directory to the server, then on `room-brain`:
+> Scaling to the 8-node gallery installation is straightforward but
+> requires studio time and resources — the design, firmware, host
+> software, and wiring spec are all in this repo.
 
-```bash
-sudo mkdir -p /opt/object-ecology
-sudo chown -R "$USER:$USER" /opt/object-ecology
-rsync -a /path/to/object-ecology-phase0/ /opt/object-ecology/
-cd /opt/object-ecology
-chmod +x tools/*
+### Working (1-node proof of concept)
+
+- Raspberry Pi Pico W node, MicroPython firmware, USB-CDC to host.
+- Real 24 V Heschen HS-0530B solenoid through a MOSFET driver, verified
+  firing at 20 / 30 / 50 / 80 ms pulse widths with no heat issues.
+- Hardware-Timer-enforced absolute pulse cutoff in firmware — the gate
+  goes LOW even if Python execution hangs mid-pulse.
+- Four-layer safety: host central rate limits, host transport guard,
+  firmware per-command checks, hardware Timer ISR + external gate
+  pulldowns.
+- Audio presence detection from a USB audio interface (M-Audio M-Track
+  Duo) via an `arecord` subprocess — smoothed dBFS plus an onset
+  detector.
+- Five-state ethology behavior loop: *social / vigilant / alarm /
+  conceal / recover*.
+- Auto-calibrating ambient threshold (rolling 20th-percentile of recent
+  dBFS) so behavior is robust across mic gain and room conditions.
+- Habituating vigilance delta — repeated sustained presence raises the
+  trigger threshold (the object gets used to you), sharp onsets snap it
+  back down.
+- Circadian rhythm multiplier on tap probability — sinusoidal curve
+  peaking at 14:00, troughing at 02:00, ratio 3.5×.
+- Chatter gesture — short bursts of quiet pulses (firmware command of
+  its own, atomic execution under per-pulse safety).
+- Self-noise blanking — the agent mutes its own presence detector
+  around its own actuations, breaking the acoustic feedback loop.
+- Refusal-as-data: every refused command logged with reason to
+  `logs/events.jsonl`.
+- 4 passing unit tests, systemd template for unattended operation.
+
+### Planned / specified but not yet built
+
+- Vibration motor (parts on the bench; pin GP14 reserved in firmware).
+- ToF proximity sensor on Pico I²C (Phase 3).
+- Eight-node spider cable assembly converging on a single DD-50
+  connector, with one Waveshare isolated USB-RS485 box per channel at
+  the central hub.
+- Per-object plinths / enclosures.
+- Long-term observation runs with and without humans.
+- Behavior parameter tuning from real-world deployment data.
+
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph room["the room"]
+        mic[microphone]
+        object["object body<br/>(metal can)"]
+        humans[humans<br/>moving · speaking]
+    end
+
+    subgraph host["room-brain (Linux)"]
+        alsa[ALSA / arecord]
+        presence["presence.py<br/>RMS · smoothed dBFS · onset"]
+        agent["ecology.py<br/>state machine<br/>mood · circadian"]
+        central["safety.py<br/>central rate limits"]
+        transport["transports.py<br/>SerialTransport"]
+        logs[("events.jsonl<br/>health.jsonl")]
+    end
+
+    subgraph node["object node"]
+        pico["Pico W<br/>main.py<br/>local safety + Timer cutoff"]
+        mosfet[MOSFET]
+        solenoid["24 V solenoid"]
+    end
+
+    humans -. footsteps · voice .-> mic
+    mic -->|USB audio| alsa
+    alsa -->|S16_LE PCM| presence
+    presence -->|smoothed dB · onset| agent
+    agent -->|TAP · CHATTER · QUIET| central
+    central -->|allow or refuse| transport
+    transport -->|line-delimited JSON over USB CDC| pico
+    pico -->|ACK or SAFETY_REFUSAL| transport
+    transport --> agent
+    pico -->|GP15| mosfet
+    mosfet -->|24 V switched| solenoid
+    solenoid -. click .-> object
+    object -. acoustic feedback .-> mic
+    agent -. every event .-> logs
+    pico -. every refusal .-> logs
 ```
 
-The fake transport runs on the Python standard library alone. The serial
-transport (a real Pico over USB CDC) needs `pyserial`, and the firmware
-upload flow uses `mpremote`. Both are pinned in `requirements.txt`:
+The microphone hears the room. ALSA delivers raw PCM samples to
+`hub/presence.py`, which computes RMS over 100 ms windows, smooths
+the dBFS reading, and watches for onsets (sharp jumps above the recent
+baseline). The agent (`hub/ecology.py`) wakes every ~2 seconds, reads
+the latest presence snapshot, polls the node for its current heat/mood
+state, runs the state machine, and decides what (if anything) to do.
+
+If the agent wants to speak, it asks the host central safety layer for
+permission. Central safety rate-limits per-node events as a coordination
+ceiling but is intentionally generous; the authoritative mechanical
+safety lives further down the stack. If permitted, the transport
+encodes a JSON command and writes it to the Pico's USB serial port.
+
+The Pico's firmware (`firmware/pico_node/main.py`) parses the command,
+runs its own local safety checks (pulse-duration cap, cooldown timer,
+rolling duty-cycle budget, heat ceiling, quiet-mode guard), and only
+then drives the GPIO pin that opens the MOSFET. Every pulse is bracketed
+by a one-shot `machine.Timer` ISR that will force the pin LOW after the
+absolute hardware cap — even if the Python interpreter itself hangs
+during the pulse. The MOSFET switches 24 V to the solenoid coil.
+The solenoid plunger strikes the object.
+
+The strike produces an acoustic event that the mic will pick up. To
+prevent the agent treating its own clicks as a new onset (and
+triggering an infinite alarm cascade), the agent briefly *blanks* the
+presence detector around every actuator command. Real acoustic events
+from the room still register cleanly.
+
+Every command attempted — accepted, refused, or errored — is appended
+to `logs/events.jsonl` with full safety status and timing. Refusals
+are not errors to hide; they're part of the record.
+
+## Behavior
+
+```mermaid
+stateDiagram-v2
+    [*] --> social: boot
+
+    social --> alarm: sharp onset
+    social --> vigilant: sustained presence
+
+    vigilant --> alarm: sharp onset
+    vigilant --> conceal: presence ≥ 12 s
+    vigilant --> social: silence
+    vigilant --> recover: silence + heat high
+
+    alarm --> vigilant: next tick
+
+    conceal --> recover: silence ≥ 8 s
+
+    recover --> social: heat ≤ 0.1
+
+    note right of social
+        occasional taps,
+        chatter bursts,
+        mood drifts toward chatty
+        when alone
+    end note
+
+    note right of vigilant
+        listening,
+        rare tiny taps
+    end note
+
+    note right of alarm
+        one sharp tap
+    end note
+```
+
+**social** is the baseline. The object occasionally taps or chatters,
+driven by a mood parameter that random-walks within bounds and *drifts
+upward* during sustained quiet — the longer the object is alone, the
+more lively it becomes. The probability of speaking on any given tick
+is also multiplied by a circadian curve that peaks at 14:00 and
+troughs at 02:00, so the object has a diurnal rhythm independent of
+acoustic conditions.
+
+**vigilant** is the response to sustained presence in the room.
+The object becomes mostly quiet — only the rarest, smallest taps —
+and waits to see whether the disturbance escalates or fades.
+
+**alarm** is the response to a sharp acoustic onset: a clap, a slam,
+a loud voice. The object fires one hard tap, then immediately drops
+to vigilant. Alarm taps are exempt from the circadian curve — a
+sleeping animal still wakes to threat.
+
+**conceal** is what happens if presence persists for too long. The
+object goes fully silent and stays that way until the room quiets
+down for several seconds, at which point it transitions to recover.
+
+**recover** is a forced cooldown when the firmware-modeled heat is
+high, or after a long conceal. Silent, waiting for the (software)
+coil temperature to fall back near zero before returning to social.
+
+Mood, the habituating vigilance delta, and the circadian phase all
+update every tick and shape what *would* otherwise be a simple state
+machine. Mood drift accumulates the longer the room is calm; the
+vigilance threshold relaxes if presence is sustained without sharp
+onsets (the object gets used to you) and snaps tighter on any onset.
+The combination produces behavior that isn't metronomic — long
+stretches of silence, then a small flurry, then quiet again, with the
+specific texture varying by time of day and recent history.
+
+## Hardware
+
+### Per object (current 1-node build)
+
+- Raspberry Pi Pico W running MicroPython 1.28
+- Heschen HS-0530B 24 V push-pull solenoid (ED% = 5%)
+- Logic-level N-channel MOSFET module (the "PWM trigger" style)
+- 1N4007 flyback diode across the solenoid coil
+- Mean Well HDR-60-24 DIN-rail PSU (60 W, mains AC in via crimped ferrules)
+- Inline 1.5 A fuse on the 24 V rail; 10 kΩ gate pulldown; 100 Ω gate series resistor
+
+### Host side (current 1-node setup)
+
+- A Linux box ("room-brain") with USB and audio in
+- M-Audio M-Track Duo (or any USB audio interface ALSA recognizes)
+- Python 3.10+ for the host services
+
+### Host side (planned 8-node setup)
+
+- Same host
+- 8 × Waveshare isolated USB-RS485 boxes in a passive central hub
+- One *spider* cable: eight individual 3–4-conductor shielded
+  twisted-pair runs (one per object) converging on a single DD-50
+  connector at the hub
+- Per-plinth AC drop (each plinth has its own Mean Well; only RS485
+  signal crosses the spider)
+
+Full per-node wiring spec at [`firmware/pico_node/WIRING.md`](firmware/pico_node/WIRING.md).
+Multi-node topology design in [`readme-brief.md`](readme-brief.md).
+
+## Running it
+
+### Install
+
+Copy the repo onto the room-brain, then:
 
 ```bash
 cd /opt/object-ecology
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
+chmod +x tools/*
 ```
 
-You can skip the install entirely while you're only exercising the fake
-transport — `import serial` is lazy and only happens when
-`room.transport.mode = "serial"`.
+`pyserial` and `mpremote` are needed for the serial transport and
+firmware upload; `numpy` is needed for the audio presence detector.
+The fake transport runs on the Python standard library alone — `import
+serial` is lazy and only happens when `room.transport.mode = "serial"`.
 
-The config files are `.yaml`, but they are intentionally written as
-JSON-shaped YAML so they can be parsed without PyYAML on a fresh server.
+The config files in `config/` are intentionally JSON-shaped YAML so
+they can be parsed without PyYAML on a fresh server.
 
-## CLI Tools
+### CLI tools
 
-From `/opt/object-ecology`:
+From the project root:
 
 ```bash
-tools/scan
-tools/ping-node CAN_01
-tools/tap-node CAN_01 --duration-ms 50
-tools/tap-node CAN_01 --duration-ms 50
-tools/tap-node CAN_01 --duration-ms 9999
-tools/vibrate-node CAN_01 --duration-ms 500
-tools/quiet-node CAN_01
-tools/monitor --iterations 3
-tools/simulate-node
+tools/scan                                              # list configured nodes + serial ports
+tools/ping-node CAN_01                                  # PONG round-trip
+tools/tap-node CAN_01 --duration-ms 50                  # one solenoid pulse
+tools/chatter-node CAN_01 --count 4 --pulse-ms 12       # burst of 4 quick clicks
+tools/vibrate-node CAN_01 --duration-ms 500             # (LED-only until motor wired)
+tools/quiet-node CAN_01                                 # kill switch
+tools/monitor --iterations 3                            # poll node state
+tools/seeing-object CAN_01                              # autonomous ecological loop
 ```
 
-Expected behavior:
-
-- `ping-node` prints a `PONG`.
-- the first safe `tap-node` prints an `ACK` if the node is not hot, quiet, or
-  cooling down.
-- repeated taps too quickly print `SAFETY_REFUSAL` with `cooldown_active`.
-- an overlong tap prints `SAFETY_REFUSAL` with
-  `max_pulse_duration_exceeded`.
-
-If you intentionally need a clean fake-node state during testing:
+### Autonomous run
 
 ```bash
-rm -f logs/fake_nodes/CAN_01.json logs/central_safety.json
+tools/seeing-object CAN_01 | tee logs/seeing-object.log
 ```
 
-## Logs
+This launches the full audio-presence + state-machine loop. Every tick
+prints a trace line; every command also lands in `logs/events.jsonl`.
+Ctrl-C is a clean shutdown — the agent sends `QUIET` to the node before
+exiting as a safety kill-switch. For overnight runs, drive it inside
+`screen` or `tmux` so SSH disconnect doesn't stop it.
 
-Command attempts are appended to:
+### Wiring the Pico
 
-```text
-logs/events.jsonl
+Full firmware upload and wiring steps are in
+[`firmware/pico_node/README.md`](firmware/pico_node/README.md) and
+[`firmware/pico_node/WIRING.md`](firmware/pico_node/WIRING.md).
+The short version:
+
+1. Flash MicroPython onto the Pico W (one-time UF2 drag-and-drop).
+2. `mpremote connect /dev/ttyACM0 cp firmware/pico_node/main.py :main.py && mpremote connect /dev/ttyACM0 reset`
+3. Point `config/room.yaml` `transport.mode` at `serial` and
+   `config/nodes.yaml` `transport_channel` at `serial`; set the
+   device to the Pico's stable by-id path.
+4. `tools/ping-node CAN_01` — Pico LED blinks, host gets a PONG.
+
+Firmware ships with `SOLENOID_ENABLED = False` so a fresh upload
+behaves identically to LED-only Phase 1 until the wiring is verified.
+
+## Layout
+
 ```
-
-Health/state records are appended to:
-
-```text
-logs/health.jsonl
+config/                   # JSON-shaped YAML — room, nodes, safety budgets
+firmware/pico_node/       # MicroPython firmware + protocol spec + wiring guide
+hub/                      # Host-side Python: protocol, transports, agent, presence
+tools/                    # Thin CLI wrappers
+tests/                    # unittest suite (4 tests)
+systemd/                  # Service template for unattended operation
+logs/                     # Runtime — events.jsonl, health.jsonl, fake-node state
+readme-brief.md           # Full design notebook (long-form)
 ```
-
-Each command event includes:
-
-- timestamp
-- node id
-- command
-- requested payload
-- central safety decision
-- node response type
-- node response payload
-- response safety status
-- transport mode
-- correlation id
-
-Refusals are not errors to hide. They are first-class events.
 
 ## Protocol
 
-Messages are line-delimited JSON so they can later be sent over serial/RS485.
+Messages are line-delimited JSON so they can later be sent over
+serial / RS485.
 
 Commands:
 
 - `PING`
 - `REQUEST_STATE`
 - `TAP`
+- `CHATTER`
 - `VIBRATE`
 - `QUIET`
 - `SET_MODE`
@@ -153,106 +373,61 @@ Responses:
 - `ERROR`
 - `SAFETY_REFUSAL`
 
-Every message includes:
+Every message includes `timestamp`, `message_type`, `node_id`,
+`correlation_id`, `payload`, and `safety_status`.
 
-- `timestamp`
-- `message_type`
-- `node_id`
-- `correlation_id`
-- `payload`
-- `safety_status`
+## Safety and refusal
 
-## Safety And Refusal
+Four layers, from highest to lowest, each able to deny independently:
 
-Central safety currently checks:
+1. **Host central safety** (`hub/safety.py`): emergency-quiet flag,
+   per-node and total per-minute event rate limits, optional duration
+   clamping.
+2. **Host transport guard** (`hub/transports.py`): synthetic `ERROR`
+   responses on timeout / I/O failure so the room-brain loop never
+   crashes on a missing or unplugged node.
+3. **Firmware command checks** (`firmware/pico_node/main.py`):
+   mirror of the central node-safety budget. Pulse cap, cooldown
+   timer, rolling duty-cycle window, heat / fatigue ceiling, quiet
+   mode. Per-command for `TAP`, `CHATTER`, `VIBRATE`.
+4. **Hardware-Timer pulse cutoff** (`machine.Timer` ISR + external
+   gate pulldown): the actuator pin is forced LOW after the absolute
+   max pulse duration regardless of what Python is doing.
 
-- emergency quiet
-- total tap rate per minute
-- tap rate per node per minute
-- optional duration clamping
+The firmware persists its heat / fatigue model across commands within
+a boot. A node that tapped one second ago will still know it is
+cooling down when the next command arrives. Refusals are recorded with
+a `reason` field (`cooldown_active`, `max_pulse_duration_exceeded`,
+`rolling_duty_cycle_exceeded`, `fatigue_heat_limit`,
+`node_quiet_mode`, etc.) so the artwork has a structured account of
+its own restraint.
 
-Fake-node local safety checks:
+## Logs
 
-- hard max solenoid pulse duration
-- minimum cooldown between taps
-- rolling duty-cycle window
-- heat/fatigue budget
-- quiet mode
+Command events: [`logs/events.jsonl`](logs/) — every command attempt,
+with timestamp, node id, command, requested payload, central safety
+decision, node response type, node response payload, response safety
+status, transport mode, and correlation id.
 
-The fake node persists state between CLI invocations. This is intentional: a
-node that tapped one second ago should still know it is cooling down when the
-next command arrives.
+Health records: [`logs/health.jsonl`](logs/) — periodic node state
+snapshots from `tools/monitor` and the main loop.
 
-## Running Tests
+Refusals are not errors to hide. They are first-class events.
+
+## Running tests
 
 ```bash
-cd /opt/object-ecology
 python3 -m unittest discover -s tests
 ```
 
-## Room-Brain Loop
+The current suite covers protocol round-tripping, fake-node behavior,
+and safety refusal. The firmware-side and audio-presence layers are
+exercised by integration runs, not unit tests.
 
-The main loop currently polls node health and logs it:
+## Systemd template
 
-```bash
-python3 -m hub.main --once
-python3 -m hub.main
-```
-
-It works against either transport — fake or serial — depending on
-`room.transport.mode`.
-
-## Talking To A Real Pico (phase 1)
-
-Phase-1 firmware is in `firmware/pico_node/`. It mirrors the fake node's
-safety model and blinks the onboard LED on accepted commands, but drives
-no other GPIO yet — see `firmware/pico_node/README.md` for the full scope.
-
-One-time wiring:
-
-1. Flash MicroPython onto the Pico W (see firmware README).
-2. Upload the firmware:
-
-   ```bash
-   mpremote connect /dev/ttyACM0 cp firmware/pico_node/main.py :main.py
-   mpremote connect /dev/ttyACM0 reset
-   ```
-
-3. Point the node at the serial transport. In `config/room.yaml`:
-
-   ```json
-   "transport": {
-     "mode": "serial",
-     "serial": {
-       "device": "/dev/serial/by-id/usb-MicroPython_Board_in_FS_mode_<serial>-if00",
-       "baud": 115200,
-       "timeout": 1.0
-     }
-   }
-   ```
-
-   And in `config/nodes.yaml`, flip the matching node:
-   `"transport_channel": "serial"`. The by-id path is preferred over
-   `/dev/ttyACM0` because it survives replug and other ACM devices.
-
-4. Run the usual CLI:
-
-   ```bash
-   tools/ping-node CAN_01      # Pico LED flashes, host gets PONG
-   tools/tap-node CAN_01 --duration-ms 50
-   tools/tap-node CAN_01 --duration-ms 50    # cooldown_active
-   tools/tap-node CAN_01 --duration-ms 9999  # max_pulse_duration_exceeded
-   ```
-
-If the Pico is unplugged or unresponsive, the host receives a synthetic
-`ERROR` with `reason` `serial_timeout` or `serial_io_failure` and the
-room-brain loop keeps going.
-
-## Systemd Template
-
-The service file is a template only. Do not enable it until manual tests pass.
-
-Install later with:
+The service file in `systemd/object-ecology.service` is a template.
+Do not enable it until manual tests pass:
 
 ```bash
 sudo cp systemd/object-ecology.service /etc/systemd/system/object-ecology.service
@@ -261,45 +436,47 @@ sudo systemctl enable object-ecology.service
 sudo systemctl start object-ecology.service
 ```
 
-Check status:
+## Roadmap
 
-```bash
-systemctl status object-ecology.service
-journalctl -u object-ecology.service -f
-```
+### Done
 
-## Later Phases
+- **Phase 0** — spine: config loading, line-delimited JSON protocol,
+  fake-node simulator, central + node-local safety budgets,
+  append-only JSONL logs, CLI tools, systemd template, unit tests.
+- **Phase 1** — USB-CDC serial transport (`hub/transports.py`),
+  Pico W MicroPython firmware mirroring the fake node's safety model.
+- **Phase 2** — real solenoid through MOSFET, hardware Timer ISR
+  pulse cutoff, per-actuator enable flags defaulting OFF, wiring
+  spec at `firmware/pico_node/WIRING.md`.
+- **Behavior layer** — audio presence (`hub/presence.py`), five-state
+  ecological agent (`hub/ecology.py`), circadian rhythm, chatter
+  gesture (firmware command + agent integration), self-noise blanking.
 
-Phase 1 (done — USB-CDC):
+### Next, in studio order
 
-- USB-CDC serial transport (`SerialTransport` in `hub/transports.py`)
-- Pico W MicroPython firmware that parses the protocol and refuses unsafe
-  commands locally (`firmware/pico_node/main.py`)
-- real RS485 serial transport for multi-node bus topology — deferred
+1. Wire the vibration motor (parts on bench; same MOSFET pattern on GP14
+   from Pico 3V3 OUT).
+2. Add the ToF sensor on Pico I²C (Phase 3 — direct proximity in
+   addition to audio).
+3. Long-term observation runs: empty-room baseline, with-humans
+   sessions. Tune behavior parameters from real data.
+4. RS485 multi-node deployment (Phase 1.5 — designed but not yet
+   built). Eight-node spider cable, DD-50 fan-in, isolated USB-RS485
+   per channel.
+5. Multi-object behavior couplings (Phase 5) — pairs and groups of
+   objects responding to each other's gestures, the full
+   security-dilemma dynamic across the population.
 
-Phase 2 (in progress — first real actuator):
+## References
 
-- GPIO output from Pico to MOSFET-switched solenoid and vibration motor
-- hardware-`Timer`-enforced absolute pulse cutoff so the gate goes LOW even
-  if Python execution hangs mid-pulse
-- wiring spec at `firmware/pico_node/WIRING.md` (Heschen HS-0530B 24 V
-  solenoid + small ERM, separate 24 V rail, common ground, flyback diodes,
-  1.5 A inline fuse, 10 kΩ gate pulldowns)
-- `SOLENOID_ENABLED` / `VIBRATION_ENABLED` constants default to False —
-  fresh upload behaves identically to phase 1 (LED only). Flip the flag and
-  re-upload only after the WIRING.md pre-power checklist passes.
+- Frid, A. & Dill, L. (2002). *Human-caused Disturbance Stimuli as a
+  Form of Predation Risk*. Conservation Ecology 6(1).
+- Jervis, R. (1978). *Cooperation Under the Security Dilemma*. World
+  Politics 30(2).
+- The design notebook ([`readme-brief.md`](readme-brief.md)) — full
+  long-form development of the concept, bill of materials, cabling,
+  and hardware decisions.
 
-Phase 3:
+## Acknowledgments
 
-- ToF sensor integration
-- piezo/contact sensing
-
-Phase 4:
-
-- room audio/prosody analysis
-
-Phase 5:
-
-- multi-object ecological behavior engine
-
-Do not proceed into real hardware without explicit confirmation.
+Made by Sebastián Suarez Solís, CalArts.
