@@ -36,11 +36,6 @@ heat ceiling — and will refuse commands that would exceed it. Every
 refusal is recorded as a first-class event, not an error. The fact
 that the object can say no is the artwork.
 
-The full conceptual development is in [`readme-brief.md`](readme-brief.md) —
-a long design notebook covering the ethology references, the
-security-dilemma framing, the actuator selection, and the gallery
-deployment topology.
-
 ## Status
 
 A complete proof of concept. One physical object node (a metal can with
