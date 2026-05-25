@@ -454,16 +454,15 @@ sudo systemctl start object-ecology.service
 
 ### Next, in studio order
 
-1. Wire the vibration motor (parts on bench; same MOSFET pattern on GP14
-   from Pico 3V3 OUT).
-2. Add the ToF sensor on Pico I²C (Phase 3 — direct proximity in
-   addition to audio).
+1. Wiring vibration motors (parts on bench; same MOSFET pattern on GP14
+   from Pico 3V3 OUT), not needed for proof of concept (same behvaior as solenoids, easier wiring, less mechanical fuss over heating).
+2. Adding the ToF sensor on Pico I²C; further telemetry.
 3. Long-term observation runs: empty-room baseline, with-humans
-   sessions. Tune behavior parameters from real data.
-4. RS485 multi-node deployment (Phase 1.5 — designed but not yet
+   sessions. Tune behavior parameters from real data. Currently, it has run without error for 4 hours, but longer tested is needed.
+4. RS485 multi-node deployment (designed but not yet
    built). Eight-node spider cable, DD-50 fan-in, isolated USB-RS485
    per channel.
-5. Multi-object behavior couplings (Phase 5) — pairs and groups of
+5. Multi-object behavior couplings – pairs and groups of
    objects responding to each other's gestures, the full
    security-dilemma dynamic across the population.
 
@@ -479,4 +478,4 @@ sudo systemctl start object-ecology.service
 
 ## Acknowledgments
 
-Made by Sebastián Suarez Solís, CalArts.
+Made by Sebastian Suarez-Solis, CalArts.
