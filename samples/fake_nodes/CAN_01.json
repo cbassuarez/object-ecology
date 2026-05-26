@@ -1,0 +1,21 @@
+{
+  "actuator_availability": {
+    "solenoid_tapper": "available",
+    "vibration_motor": "available"
+  },
+  "current_mode": "social",
+  "fake_piezo_ring": 0.5,
+  "fake_tof_distance_mm": 900,
+  "fatigue": 0.1890809392929077,
+  "heat": 0.1890809392929077,
+  "last_tap_time": 1779497097.2541668,
+  "last_update": 1779497097.5273554,
+  "node_id": "CAN_01",
+  "online": true,
+  "rolling_on_events": [
+    {
+      "duration_ms": 50,
+      "time": 1779497097.2541668
+    }
+  ]
+}

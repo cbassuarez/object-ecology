@@ -1,0 +1,76 @@
+{
+  "tap_events": [
+    {
+      "time": 1779659837.5717227,
+      "node_id": "CAN_01",
+      "command": "TAP",
+      "duration_ms": 77
+    },
+    {
+      "time": 1779659840.2338817,
+      "node_id": "CAN_01",
+      "command": "CHATTER",
+      "duration_ms": 45
+    },
+    {
+      "time": 1779659842.2987447,
+      "node_id": "CAN_01",
+      "command": "TAP",
+      "duration_ms": 77
+    },
+    {
+      "time": 1779659844.2923253,
+      "node_id": "CAN_01",
+      "command": "CHATTER",
+      "duration_ms": 24
+    },
+    {
+      "time": 1779659846.3492293,
+      "node_id": "CAN_01",
+      "command": "TAP",
+      "duration_ms": 52
+    },
+    {
+      "time": 1779659860.4787705,
+      "node_id": "CAN_01",
+      "command": "CHATTER",
+      "duration_ms": 36
+    },
+    {
+      "time": 1779659866.9258978,
+      "node_id": "CAN_01",
+      "command": "CHATTER",
+      "duration_ms": 44
+    },
+    {
+      "time": 1779659869.744781,
+      "node_id": "CAN_01",
+      "command": "CHATTER",
+      "duration_ms": 40
+    },
+    {
+      "time": 1779659872.3353276,
+      "node_id": "CAN_01",
+      "command": "TAP",
+      "duration_ms": 40
+    },
+    {
+      "time": 1779659885.908323,
+      "node_id": "CAN_01",
+      "command": "TAP",
+      "duration_ms": 55
+    },
+    {
+      "time": 1779659891.8145475,
+      "node_id": "CAN_01",
+      "command": "CHATTER",
+      "duration_ms": 39
+    },
+    {
+      "time": 1779659893.5451925,
+      "node_id": "CAN_01",
+      "command": "TAP",
+      "duration_ms": 44
+    }
+  ]
+}
